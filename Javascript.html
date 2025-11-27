@@ -1,0 +1,439 @@
+<script>
+// ==========================================
+// 1. GLOBAL STATE & INIT
+// ==========================================
+let currentUser = JSON.parse(localStorage.getItem('audit_user'));
+let currentCabang = localStorage.getItem('audit_cabang') || "";
+let selectedLokasi = null;
+
+// Jalankan saat halaman dimuat
+window.onload = function() {
+    // Cek apakah user sudah login sebelumnya
+    if(currentUser) {
+        // Hapus layar login jika ada
+        const loginEl = document.getElementById('login-wrapper');
+        if(loginEl) loginEl.remove();
+        
+        // Masuk ke aplikasi utama
+        initApp();
+    }
+};
+
+// Fungsi inisialisasi aplikasi setelah login
+function initApp() {
+    // Tampilkan container aplikasi dengan animasi halus
+    const appContainer = document.getElementById('app-container');
+    appContainer.classList.remove('hidden');
+    setTimeout(() => appContainer.classList.remove('opacity-0'), 50);
+
+    // Refresh data user dari storage
+    currentUser = JSON.parse(localStorage.getItem('audit_user'));
+    if(currentUser) {
+        document.getElementById('user-display-name').innerText = currentUser.username;
+        document.getElementById('user-display-role').innerText = currentUser.role;
+    }
+
+    // Muat daftar cabang dan set halaman awal
+    loadDaftarCabang();
+    navigasi('halaman-dashboard');
+}
+
+// Fungsi Logout
+function doLogout() {
+    if(confirm('Yakin ingin keluar aplikasi?')) {
+        localStorage.clear(); // Hapus sesi
+        location.reload();    // Reload agar kembali ke login
+    }
+}
+
+// ==========================================
+// 2. NAVIGASI HALAMAN & SIDEBAR
+// ==========================================
+function navigasi(id) {
+    // Sembunyikan semua halaman
+    document.querySelectorAll('.halaman').forEach(el => el.classList.add('hidden'));
+    
+    // Tampilkan halaman target
+    const target = document.getElementById(id);
+    if(target) target.classList.remove('hidden');
+    
+    // Logika khusus saat membuka halaman tertentu
+    if(id === 'halaman-dashboard') refreshDashboard();
+    if(id.includes('laporan')) { 
+        loadLaporan('VALID'); 
+        loadLaporan('NA'); 
+    }
+
+    // Tutup sidebar mobile jika sedang terbuka
+    const mobileSidebar = document.getElementById('mobile-sidebar');
+    if(mobileSidebar && !mobileSidebar.classList.contains('-translate-x-full')) {
+        toggleSidebar();
+    }
+}
+
+// Toggle Sidebar Mobile
+function toggleSidebar() {
+    const s = document.getElementById('mobile-sidebar');
+    const b = document.getElementById('mobile-sidebar-backdrop');
+    
+    if(s.classList.contains('-translate-x-full')) {
+        // Buka
+        s.classList.remove('-translate-x-full'); 
+        b.classList.remove('hidden');
+    } else {
+        // Tutup
+        s.classList.add('-translate-x-full'); 
+        b.classList.add('hidden');
+    }
+}
+
+// Toggle Sidebar Desktop (Minimize)
+function toggleDesktopSidebar() {
+    const s = document.getElementById('desktop-sidebar');
+    s.classList.toggle('hidden');
+}
+
+// ==========================================
+// 3. LOGIKA CABANG
+// ==========================================
+function loadDaftarCabang() {
+    google.script.run.withSuccessHandler(res => {
+        const sel = document.getElementById('pilih-cabang');
+        sel.innerHTML = '<option value="" disabled selected>Pilih Cabang...</option>';
+        
+        res.list.forEach(c => {
+            let opt = document.createElement('option');
+            opt.value = c; 
+            opt.innerText = c;
+            sel.appendChild(opt);
+        });
+
+        // Auto-select jika ada histori cabang
+        if(currentCabang && res.list.includes(currentCabang)) {
+            sel.value = currentCabang;
+            updateUIBranch();
+        }
+    }).getDaftarCabang(currentUser ? currentUser.username : "");
+}
+
+function gantiCabang(val) {
+    currentCabang = val;
+    localStorage.setItem('audit_cabang', val);
+    updateUIBranch();
+    showToast("Cabang aktif: " + val);
+    refreshDashboard(); // Refresh data dashboard sesuai cabang baru
+}
+
+function updateUIBranch() {
+    const infoEl = document.getElementById('dash-cabang-info');
+    if(infoEl) infoEl.innerText = currentCabang;
+}
+
+// ==========================================
+// 4. OPERASIONAL (PENCARIAN & INPUT)
+// ==========================================
+function handleEnter(e) { 
+    if(e.key === 'Enter') cariBarang(); 
+}
+
+function cariBarang() {
+    if(!currentCabang) return showToast("Harap pilih Cabang terlebih dahulu!");
+    
+    const dpackEl = document.getElementById('input-dpack');
+    const dpack = dpackEl.value.trim();
+    if(!dpack) return showToast("Scan atau ketik kode barang!");
+
+    // UI State: Loading
+    document.getElementById('loading-cari').classList.remove('hidden');
+    document.getElementById('area-detail').classList.add('hidden');
+    document.getElementById('area-input-qty').classList.add('hidden');
+    dpackEl.disabled = true;
+
+    selectedLokasi = null; // Reset lokasi terpilih
+
+    // Panggil Backend
+    google.script.run.withSuccessHandler(res => {
+        // UI State: Selesai Loading
+        document.getElementById('loading-cari').classList.add('hidden');
+        document.getElementById('area-detail').classList.remove('hidden');
+        document.getElementById('area-input-qty').classList.remove('hidden');
+        
+        const cont = document.getElementById('lokasi-container');
+        const badge = document.getElementById('badge-status');
+        const namaPart = document.getElementById('hasil-part-number');
+        const statusInp = document.getElementById('status-barang');
+        
+        cont.innerHTML = ''; // Bersihkan hasil sebelumnya
+
+        if(res.found) {
+            // --- BARANG VALID ---
+            namaPart.innerText = res.partNumber;
+            statusInp.value = 'VALID';
+            badge.innerText = "VALID"; 
+            badge.className = "text-xs font-bold px-2 py-1 bg-green-100 text-green-700 rounded border border-green-200";
+            
+            // Render Pilihan Lokasi
+            res.items.forEach((item, idx) => {
+                let div = document.createElement('div');
+                div.className = "lokasi-item p-3 border rounded-xl cursor-pointer hover:bg-blue-50 flex justify-between items-center transition-all mb-2";
+                div.innerHTML = `
+                    <div>
+                        <div class='text-[10px] font-bold text-gray-400 uppercase'>Lokasi</div>
+                        <div class='font-bold text-gray-800 text-lg'>${item.lokasi}</div>
+                    </div>
+                    <div class='text-right'>
+                        <div class='text-[10px] font-bold text-gray-400 uppercase'>Sistem</div>
+                        <div class='font-bold text-blue-600 text-lg'>${item.stockSistem}</div>
+                    </div>
+                `;
+                div.onclick = function() { pilihLokasi(item.lokasi, this); };
+                cont.appendChild(div);
+            });
+            
+            // Otomatis pilih lokasi pertama jika ada
+            if(res.items.length > 0) pilihLokasi(res.items[0].lokasi, cont.firstChild);
+
+        } else {
+            // --- BARANG NA / UNKNOWN ---
+            namaPart.innerText = "Tidak Dikenal (Unknown)";
+            statusInp.value = 'NA';
+            badge.innerText = "N/A"; 
+            badge.className = "text-xs font-bold px-2 py-1 bg-red-100 text-red-700 rounded border border-red-200";
+            
+            cont.innerHTML = `
+                <div class='bg-red-50 p-3 rounded-xl border border-red-100 text-red-600 text-sm flex items-center gap-2'>
+                    <i class="ph ph-warning-circle text-lg"></i>
+                    Barang tidak ditemukan di Master Database.
+                </div>`;
+            selectedLokasi = "UNKNOWN";
+        }
+        
+        // Fokus ke input Qty
+        const iQty = document.getElementById('input-qty');
+        iQty.value = 1;
+        iQty.focus();
+        iQty.select();
+
+    }).cariBarangDiMaster(dpack, currentCabang);
+}
+
+// Fungsi helper saat memilih lokasi rak
+function pilihLokasi(loc, el) {
+    selectedLokasi = loc;
+    // Reset style semua item
+    document.querySelectorAll('.lokasi-item').forEach(x => {
+        x.classList.remove('bg-blue-50', 'border-blue-500', 'ring-1', 'ring-blue-500');
+        x.classList.add('border-gray-200');
+    });
+    // Highlight item terpilih
+    el.classList.remove('border-gray-200');
+    el.classList.add('bg-blue-50', 'border-blue-500', 'ring-1', 'ring-blue-500');
+}
+
+// Fungsi helper tombol +/- qty
+function ubahQty(n) {
+    let el = document.getElementById('input-qty');
+    let v = parseInt(el.value) || 0;
+    if(v + n > 0) el.value = v + n;
+}
+
+// Reset form input scan
+function resetForm() {
+    const dpackEl = document.getElementById('input-dpack');
+    dpackEl.value = '';
+    dpackEl.disabled = false;
+    
+    document.getElementById('area-detail').classList.add('hidden');
+    document.getElementById('area-input-qty').classList.add('hidden');
+    
+    dpackEl.focus();
+}
+
+// Fungsi Simpan Data
+function simpanTemuan() {
+    const trx = document.getElementById('input-id-trx').value.trim();
+    if(!trx) return showToast("Wajib mengisi ID Transaksi (SPK)!");
+    
+    const status = document.getElementById('status-barang').value;
+    if(status === 'VALID' && !selectedLokasi) return showToast("Harap pilih Lokasi Rak!");
+
+    const btn = document.getElementById('btn-simpan');
+    const originalText = btn.innerHTML;
+    
+    // UI Loading Simpan
+    btn.disabled = true; 
+    btn.innerHTML = `<i class="ph ph-spinner animate-spin text-xl"></i> Menyimpan...`;
+
+    const data = {
+        cabang: currentCabang,
+        idTransaksi: trx,
+        partDpack: document.getElementById('input-dpack').value,
+        qty: document.getElementById('input-qty').value,
+        status: status,
+        partNumber: document.getElementById('hasil-part-number').innerText,
+        lokasiSeharusnya: selectedLokasi
+    };
+
+    google.script.run.withSuccessHandler(res => {
+        btn.disabled = false; 
+        btn.innerHTML = originalText;
+        
+        if(res.success) {
+            showToast("Data berhasil disimpan!", "success");
+            resetForm();
+        } else {
+            showToast("Gagal menyimpan: " + res.message);
+        }
+    }).simpanDataTemuan(data);
+}
+
+// ==========================================
+// 5. LAPORAN & DASHBOARD
+// ==========================================
+function refreshDashboard() {
+    if(!currentCabang) return;
+    
+    google.script.run.withSuccessHandler(d => {
+        // Update Angka Statistik
+        document.getElementById('dash-total-qty').innerText = d.totalQty;
+        document.getElementById('dash-valid-sku').innerText = d.validSKU;
+        document.getElementById('dash-na-sku').innerText = d.naSKU;
+        document.getElementById('dash-valid-qty-detail').innerText = d.validQty + " Pcs";
+        document.getElementById('dash-na-qty-detail').innerText = d.naQty + " Pcs";
+        
+        // Update Tabel Aktivitas Terakhir
+        const list = document.getElementById('dash-activity-list');
+        list.innerHTML = '';
+        
+        if(d.recent.length === 0) {
+            list.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-400 text-xs">Belum ada aktivitas</td></tr>`;
+        } else {
+            d.recent.forEach(r => {
+                let colorClass = r.type==='VALID' ? 'text-gray-700' : 'text-red-600 font-bold';
+                let typeBadge = r.type==='VALID' 
+                    ? '<span class="w-2 h-2 rounded-full bg-green-500 inline-block mr-1"></span>' 
+                    : '<span class="w-2 h-2 rounded-full bg-red-500 inline-block mr-1"></span>';
+                    
+                list.innerHTML += `
+                    <tr class='border-b hover:bg-gray-50 transition'>
+                        <td class='p-3 ${colorClass} text-xs font-mono'>
+                            ${typeBadge}${r.dpack}
+                        </td>
+                        <td class='p-3 text-right font-bold text-sm'>${r.qty}</td>
+                        <td class='p-3 text-right text-[10px] text-gray-400 font-mono'>
+                            ${new Date(r.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        </td>
+                    </tr>`;
+            });
+        }
+    }).getDashboardStats(currentCabang);
+}
+
+function loadLaporan(type) {
+    if(!currentCabang) return;
+    
+    const tbody = document.getElementById(type==='VALID' ? 'tbody-valid' : 'tbody-na');
+    const colSpan = type==='VALID' ? 7 : 5;
+    
+    // Tampilkan Loading State
+    tbody.innerHTML = `<tr><td colspan='${colSpan}' class='p-8 text-center text-gray-400'><i class="ph ph-spinner animate-spin text-2xl mb-2"></i><br>Memuat Data...</td></tr>`;
+    
+    google.script.run.withSuccessHandler(rows => {
+        tbody.innerHTML = '';
+        
+        if(rows.length === 0) {
+            tbody.innerHTML = `<tr><td colspan='${colSpan}' class='p-8 text-center text-gray-400 italic'>Belum ada data</td></tr>`;
+            return;
+        }
+        
+        rows.forEach(r => {
+            // NOTE: r[0] adalah Nama Cabang. Kita skip tampilkan di tabel karena user sudah tau dia di cabang mana.
+            
+            let html = `<tr class='border-b hover:bg-gray-50 transition group'>`;
+            
+            if(type === 'VALID') {
+                // Mapping Valid: r[1]=ID, r[2]=Code, r[3]=Qty, r[4]=Name, r[5]=Loc, r[6]=Time
+                html += `
+                    <td class='p-3 font-mono text-xs text-gray-500'>${r[1]}</td>
+                    <td class='p-3 font-bold text-sm text-gray-800'>${r[2]}</td>
+                    <td class='p-3 font-bold text-blue-600 text-center bg-blue-50/50 rounded'>${r[3]}</td>
+                    <td class='p-3 text-xs text-gray-600 max-w-[150px] truncate' title="${r[4]}">${r[4]}</td>
+                    <td class='p-3 text-xs'>
+                        <span class="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded font-bold">${r[5]}</span>
+                    </td>
+                    <td class='p-3 text-[10px] text-gray-400 font-mono'>
+                        ${new Date(r[6]).toLocaleString([], {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})}
+                    </td>
+                    <td class='p-3 text-center'>
+                         <button onclick="hapusItem('${r[2]}','VALID','${r[1]}')" class="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition" title="Hapus">
+                            <i class="ph ph-trash text-lg"></i>
+                         </button>
+                    </td>
+                `;
+            } else {
+                // Mapping NA: r[1]=ID, r[2]=Code, r[3]=Qty, r[4]=Time
+                html += `
+                    <td class='p-3 font-mono text-xs text-gray-500'>${r[1]}</td>
+                    <td class='p-3 font-bold text-red-600 text-sm'>${r[2]}</td>
+                    <td class='p-3 font-bold text-center bg-red-50/50 rounded'>${r[3]}</td>
+                    <td class='p-3 text-[10px] text-gray-400 font-mono'>
+                        ${new Date(r[4]).toLocaleString([], {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})}
+                    </td>
+                    <td class='p-3 text-center'>
+                         <button onclick="hapusItem('${r[2]}','NA','${r[1]}')" class="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition" title="Hapus">
+                            <i class="ph ph-trash text-lg"></i>
+                         </button>
+                    </td>
+                `;
+            }
+            html += `</tr>`;
+            tbody.innerHTML += html;
+        });
+    }).getLaporanData(type, currentCabang);
+}
+
+// Fungsi Hapus Item dari Tabel
+function hapusItem(dpack, type, idTrx) {
+    if(confirm('Apakah Anda yakin ingin menghapus data ini secara PERMANEN?')) {
+        google.script.run.withSuccessHandler(r => {
+            if(r.success) { 
+                showToast("Data berhasil dihapus", "success"); 
+                loadLaporan(type); 
+                refreshDashboard(); 
+            } else { 
+                showToast("Gagal menghapus data", "error"); 
+            }
+        }).hapusItem(dpack, type, currentCabang, idTrx);
+    }
+}
+
+// ==========================================
+// 6. UTILITIES
+// ==========================================
+function showToast(msg, type = 'normal') {
+    const t = document.getElementById('toast');
+    t.innerText = msg;
+    
+    // Reset classes
+    t.className = "fixed bottom-6 right-6 px-6 py-4 rounded-xl shadow-2xl z-50 text-white font-bold transition duration-300 translate-y-24";
+    
+    // Set warna berdasarkan tipe
+    if(type === 'success') {
+        t.classList.add('bg-green-600');
+    } else if(type === 'error') {
+        t.classList.add('bg-red-600');
+    } else {
+        t.classList.add('bg-gray-800');
+    }
+    
+    // Tampilkan (Slide Up)
+    requestAnimationFrame(() => {
+        t.classList.remove('translate-y-24');
+    });
+
+    // Sembunyikan otomatis setelah 3 detik
+    setTimeout(() => {
+        t.classList.add('translate-y-24');
+    }, 3000);
+}
+</script>
