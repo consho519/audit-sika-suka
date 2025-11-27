@@ -1,0 +1,62 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+body { font-family: 'Inter', sans-serif; }
+
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f1f1f1; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* --- SETTING KHUSUS CETAK (PRINT) --- */
+@media print {
+    /* Sembunyikan elemen yang tidak perlu dicetak */
+    aside,                  /* Sidebar Desktop */
+    #mobile-sidebar,        /* Sidebar Mobile */
+    header,                 /* Header Atas */
+    #toast,                 /* Notifikasi */
+    .no-print,              /* Class khusus elemen non-cetak */
+    button,                 /* Semua tombol */
+    .hidden                 /* Elemen tersembunyi */
+    {
+        display: none !important;
+    }
+
+    /* Reset Layout agar kertas penuh */
+    body, #app-container, main, #konten-utama {
+        background: white !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        position: static !important;
+        height: auto !important;
+    }
+
+    /* Pastikan halaman laporan terlihat saat print */
+    .halaman:not(.hidden) {
+        display: block !important;
+        position: static !important;
+        width: 100% !important;
+    }
+
+    /* Styling Tabel Cetak */
+    table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        border: 1px solid #000 !important;
+        font-size: 10pt !important;
+    }
+    
+    th, td {
+        border: 1px solid #000 !important;
+        padding: 4px !important;
+        color: #000 !important;
+    }
+    
+    thead {
+        background-color: #eee !important;
+        -webkit-print-color-adjust: exact; 
+    }
+}
+</style>
