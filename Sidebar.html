@@ -9,78 +9,98 @@
     <!-- Menu Navigasi -->
     <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
         
-        <!-- Menu Dashboard -->
-        <button onclick="navigasi('halaman-dashboard')" class="w-full flex items-center px-4 py-3 rounded-xl text-gray-600 hover:bg-blue-50 hover:text-blue-600 font-medium transition-all group">
-            <i class="ph ph-squares-four text-xl mr-3 text-gray-400 group-hover:text-blue-600 transition-colors"></i> 
-            Dashboard
-        </button>
-        
-        <!-- Menu Input -->
-        <button onclick="navigasi('halaman-input')" class="w-full flex items-center px-4 py-3 rounded-xl text-gray-600 hover:bg-blue-50 hover:text-blue-600 font-medium transition-all group">
-            <i class="ph ph-barcode text-xl mr-3 text-gray-400 group-hover:text-blue-600 transition-colors"></i> 
-            Input Temuan
-        </button>
-        
-        <!-- Divider Laporan -->
-        <div class="pt-6 pb-2 text-xs font-bold text-gray-400 uppercase ml-2 tracking-wider flex items-center gap-2">
-            <span class="flex-1 h-px bg-gray-200"></span>
-            Laporan
-            <span class="flex-1 h-px bg-gray-200"></span>
+        <!-- 1. MENU GROUP: DATA TEMUAN -->
+        <div>
+            <button onclick="toggleSubmenu('sub-desktop-temuan', 'arrow-desktop-temuan')" class="w-full flex items-center justify-between px-4 py-3 rounded-xl text-gray-700 hover:bg-gray-50 font-bold transition-all group">
+                <div class="flex items-center gap-3">
+                    <i class="ph ph-stack text-xl text-blue-600"></i>
+                    <span>DATA TEMUAN</span>
+                </div>
+                <i id="arrow-desktop-temuan" class="ph ph-caret-down text-gray-400 transition-transform duration-300"></i>
+            </button>
+
+            <!-- SUB MENU CONTAINER (Hidden by default) -->
+            <div id="sub-desktop-temuan" class="hidden pl-4 mt-1 space-y-1 border-l-2 border-gray-100 ml-4 transition-all">
+                
+                <!-- Dashboard -->
+                <button onclick="navigasi('halaman-dashboard')" class="w-full flex items-center px-4 py-2 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 text-sm font-medium transition-all">
+                    <i class="ph ph-squares-four text-lg mr-2"></i> Dashboard
+                </button>
+
+                <!-- Input Temuan -->
+                <button onclick="navigasi('halaman-input')" class="w-full flex items-center px-4 py-2 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 text-sm font-medium transition-all">
+                    <i class="ph ph-barcode text-lg mr-2"></i> Input Temuan
+                </button>
+
+                <!-- Data Valid -->
+                <button onclick="navigasi('halaman-laporan-valid')" class="w-full flex items-center px-4 py-2 rounded-lg text-gray-500 hover:text-green-600 hover:bg-green-50 text-sm font-medium transition-all">
+                    <i class="ph ph-check-circle text-lg mr-2"></i> Data Valid
+                </button>
+
+                <!-- Data NA -->
+                <button onclick="navigasi('halaman-laporan-na')" class="w-full flex items-center px-4 py-2 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 text-sm font-medium transition-all">
+                    <i class="ph ph-warning-circle text-lg mr-2"></i> Data N/A
+                </button>
+            </div>
         </div>
-        
-        <!-- Menu Laporan Valid -->
-        <button onclick="navigasi('halaman-laporan-valid')" class="w-full flex items-center px-4 py-3 rounded-xl text-gray-600 hover:bg-green-50 hover:text-green-700 font-medium transition-all group">
-            <i class="ph ph-check-circle text-xl mr-3 text-gray-400 group-hover:text-green-600 transition-colors"></i> 
-            Data Valid
-        </button>
-        
-        <!-- Menu Laporan NA -->
-        <button onclick="navigasi('halaman-laporan-na')" class="w-full flex items-center px-4 py-3 rounded-xl text-gray-600 hover:bg-red-50 hover:text-red-700 font-medium transition-all group">
-            <i class="ph ph-warning-circle text-xl mr-3 text-gray-400 group-hover:text-red-600 transition-colors"></i> 
-            Data N/A
-        </button>
+
+        <!-- CONTOH TEMPAT MENU BARU NANTI (Bisa ditambah disini) -->
+        <!-- 
+        <button class="w-full flex items-center px-4 py-3 rounded-xl text-gray-600 hover:bg-gray-50 ...">
+            <i class="ph ph-gear text-xl mr-3"></i> Pengaturan
+        </button> 
+        -->
+
     </nav>
 
     <!-- Footer Sidebar -->
     <div class="p-4 border-t text-xs text-center text-gray-400">
-        v1.0 &copy; Audit System
+        v2.0 &copy; Audit System
     </div>
 </aside>
 
 <!-- SIDEBAR MOBILE (Overlay) -->
-<!-- Backdrop Gelap -->
 <div id="mobile-sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black/50 z-30 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
 
-<!-- Panel Menu -->
 <div id="mobile-sidebar" class="fixed inset-y-0 left-0 w-72 bg-white shadow-2xl transform -translate-x-full transition-transform duration-300 ease-in-out z-40 md:hidden flex flex-col">
     <div class="h-16 bg-gradient-to-r from-blue-600 to-indigo-700 text-white flex items-center justify-between px-6 font-bold shadow-md">
-        <span class="flex items-center gap-2"><i class="ph ph-list text-2xl"></i> MENU UTAMA</span>
+        <span class="flex items-center gap-2"><i class="ph ph-list text-2xl"></i> MENU</span>
         <button onclick="toggleSidebar()" class="text-white/80 hover:text-white"><i class="ph ph-x text-2xl"></i></button>
     </div>
     
     <nav class="p-4 space-y-2 flex-1 overflow-y-auto">
-        <button onclick="navigasi('halaman-dashboard');toggleSidebar()" class="block w-full text-left px-5 py-4 rounded-xl hover:bg-blue-50 text-gray-700 font-medium border-b border-gray-50 hover:border-blue-100 transition-all flex items-center gap-3">
-            <i class="ph ph-squares-four text-lg text-gray-400"></i> Dashboard
-        </button>
-        <button onclick="navigasi('halaman-input');toggleSidebar()" class="block w-full text-left px-5 py-4 rounded-xl hover:bg-blue-50 text-gray-700 font-medium border-b border-gray-50 hover:border-blue-100 transition-all flex items-center gap-3">
-            <i class="ph ph-barcode text-lg text-gray-400"></i> Input Scan
-        </button>
         
-        <div class="py-4 px-2">
-            <p class="text-xs font-bold text-gray-400 uppercase mb-2">Laporan Data</p>
-            <button onclick="navigasi('halaman-laporan-valid');toggleSidebar()" class="block w-full text-left px-5 py-3 rounded-lg hover:bg-green-50 text-gray-600 hover:text-green-700 text-sm font-medium mb-1 transition-all flex items-center gap-3">
-                <i class="ph ph-check-circle text-lg text-gray-400"></i> Data Valid
+        <!-- MENU GROUP MOBILE -->
+        <div>
+            <button onclick="toggleSubmenu('sub-mobile-temuan', 'arrow-mobile-temuan')" class="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-gray-50 text-gray-800 font-bold">
+                <div class="flex items-center gap-3">
+                    <i class="ph ph-stack text-xl text-blue-600"></i>
+                    <span>DATA TEMUAN</span>
+                </div>
+                <i id="arrow-mobile-temuan" class="ph ph-caret-down text-gray-400 transition-transform duration-300"></i>
             </button>
-            <button onclick="navigasi('halaman-laporan-na');toggleSidebar()" class="block w-full text-left px-5 py-3 rounded-lg hover:bg-red-50 text-gray-600 hover:text-red-700 text-sm font-medium transition-all flex items-center gap-3">
-                <i class="ph ph-warning-circle text-lg text-gray-400"></i> Data N/A
-            </button>
+
+            <div id="sub-mobile-temuan" class="hidden pl-2 mt-2 space-y-1">
+                <button onclick="navigasi('halaman-dashboard');toggleSidebar()" class="w-full flex items-center px-4 py-3 rounded-lg text-gray-500 hover:bg-blue-50 hover:text-blue-600">
+                    <i class="ph ph-squares-four mr-3"></i> Dashboard
+                </button>
+                <button onclick="navigasi('halaman-input');toggleSidebar()" class="w-full flex items-center px-4 py-3 rounded-lg text-gray-500 hover:bg-blue-50 hover:text-blue-600">
+                    <i class="ph ph-barcode mr-3"></i> Input Temuan
+                </button>
+                <button onclick="navigasi('halaman-laporan-valid');toggleSidebar()" class="w-full flex items-center px-4 py-3 rounded-lg text-gray-500 hover:bg-green-50 hover:text-green-600">
+                    <i class="ph ph-check-circle mr-3"></i> Data Valid
+                </button>
+                <button onclick="navigasi('halaman-laporan-na');toggleSidebar()" class="w-full flex items-center px-4 py-3 rounded-lg text-gray-500 hover:bg-red-50 hover:text-red-600">
+                    <i class="ph ph-warning-circle mr-3"></i> Data N/A
+                </button>
+            </div>
         </div>
+
     </nav>
 
-    <!-- Tombol Logout di Mobile -->
     <div class="p-4 border-t bg-gray-50">
         <button onclick="doLogout()" class="w-full flex items-center justify-center gap-2 py-3 bg-white border border-red-100 text-red-600 rounded-xl font-bold hover:bg-red-50 transition shadow-sm">
-            <i class="ph ph-sign-out text-lg"></i> Keluar Aplikasi
+            <i class="ph ph-sign-out text-lg"></i> Keluar
         </button>
     </div>
 </div>
