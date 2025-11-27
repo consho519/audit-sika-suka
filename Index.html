@@ -5,23 +5,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audit Suka Suka App</title>
-    <!-- Library -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <?!= include('CSS'); ?>
 </head>
 <body class="bg-gray-50 text-slate-800 h-screen overflow-hidden flex flex-col font-sans">
 
-    <!-- 1. COMPONENT LOGIN -->
     <?!= include('Login'); ?>
 
-    <!-- 2. COMPONENT APP UTAMA (Hidden saat awal) -->
     <div id="app-container" class="flex h-full w-full opacity-0 hidden transition-opacity duration-700">
-        
-        <!-- SIDEBAR -->
         <?!= include('Sidebar'); ?>
 
-        <!-- KONTEN -->
         <main class="flex-1 flex flex-col h-full overflow-hidden relative w-full">
             
             <!-- HEADER MOBILE -->
@@ -48,14 +42,23 @@
                 </div>
             </header>
 
+            <!-- BULK ACTION BAR (Melayang saat ada item dipilih) -->
+            <div id="bulk-action-bar" class="hidden absolute top-20 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-6 animate-fade-in border border-gray-700">
+                <span class="text-sm font-bold text-gray-300"><span id="selected-count" class="text-white text-lg">0</span> terpilih</span>
+                <div class="h-6 w-px bg-gray-700"></div>
+                <button onclick="bulkEdit()" class="text-yellow-400 hover:text-yellow-300 text-sm font-bold flex items-center gap-2 transition"><i class="ph ph-pencil-simple text-lg"></i> Edit Qty</button>
+                <button onclick="bulkDelete()" class="text-red-400 hover:text-red-300 text-sm font-bold flex items-center gap-2 transition"><i class="ph ph-trash text-lg"></i> Hapus</button>
+                <button onclick="clearSelection()" class="ml-2 text-gray-500 hover:text-white transition"><i class="ph ph-x text-lg"></i></button>
+            </div>
+
             <!-- CONTAINER SCROLLABLE -->
             <div id="konten-utama" class="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50">
 
-                <!-- HALAMAN DASHBOARD -->
+                <!-- DASHBOARD -->
                 <div id="halaman-dashboard" class="halaman hidden space-y-6">
                     <div class="flex justify-between items-end">
                         <h2 class="text-2xl font-bold text-gray-800">Dashboard</h2>
-                        <button onclick="refreshDashboard()" class="bg-white border p-2 rounded shadow-sm text-blue-600"><i class="ph ph-arrows-clockwise text-lg"></i></button>
+                        <button onclick="refreshDashboard()" class="bg-white border p-2 rounded shadow-sm text-blue-600 hover:bg-blue-50"><i class="ph ph-arrows-clockwise text-lg"></i></button>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-blue-500">
@@ -73,7 +76,6 @@
                             <div class="text-xs text-red-600 mt-1" id="dash-na-qty-detail">0 Pcs</div>
                         </div>
                     </div>
-                    <!-- Activity Table -->
                     <div class="bg-white rounded-xl shadow-sm overflow-hidden border">
                         <div class="p-3 border-b font-bold bg-gray-50 text-sm">Aktivitas Terakhir</div>
                         <table class="w-full text-sm text-left">
@@ -83,63 +85,121 @@
                     </div>
                 </div>
 
-                <!-- HALAMAN INPUT -->
+                <!-- INPUT -->
                 <div id="halaman-input" class="halaman hidden max-w-2xl mx-auto">
                     <div class="bg-white rounded-2xl shadow-lg border overflow-hidden">
                         <div class="bg-blue-600 p-4 text-white text-center font-bold">Input Stock Opname</div>
                         <div class="p-6 space-y-4">
-                            <!-- Config -->
                             <div class="grid grid-cols-2 gap-4">
-                                <div><label class="text-xs font-bold text-gray-500">Cabang</label><select id="pilih-cabang" onchange="gantiCabang(this.value)" class="w-full border rounded p-2 bg-gray-50 font-bold"><option>Loading...</option></select></div>
-                                <div><label class="text-xs font-bold text-gray-500">ID Trx</label><input type="text" id="input-id-trx" class="w-full border rounded p-2 bg-gray-50 font-bold" placeholder="SO-001"></div>
+                                <div><label class="text-xs font-bold text-gray-500">Cabang</label><select id="pilih-cabang" onchange="gantiCabang(this.value)" class="w-full border rounded p-2 bg-gray-50 font-bold focus:ring-2 focus:ring-blue-500 outline-none"><option>Loading...</option></select></div>
+                                <div><label class="text-xs font-bold text-gray-500">ID Trx</label><input type="text" id="input-id-trx" class="w-full border rounded p-2 bg-gray-50 font-bold focus:ring-2 focus:ring-blue-500 outline-none" placeholder="SO-001"></div>
                             </div>
-                            <!-- Scan -->
                             <div class="flex gap-2">
                                 <input type="text" id="input-dpack" onkeydown="handleEnter(event)" class="w-full border-2 border-blue-100 rounded p-3 text-lg font-mono focus:border-blue-500 outline-none" placeholder="Scan Barcode..." autofocus>
-                                <button onclick="cariBarang()" class="bg-blue-600 text-white px-4 rounded font-bold"><i class="ph ph-magnifying-glass text-xl"></i></button>
+                                <button onclick="cariBarang()" class="bg-blue-600 text-white px-4 rounded font-bold hover:bg-blue-700"><i class="ph ph-magnifying-glass text-xl"></i></button>
                             </div>
-                            <!-- Loading -->
                             <div id="loading-cari" class="hidden text-center py-4"><i class="ph ph-spinner animate-spin text-3xl text-blue-500"></i></div>
-                            <!-- Result -->
                             <div id="area-detail" class="hidden bg-gray-50 rounded p-4 border">
                                 <div class="flex justify-between"><h3 id="hasil-part-number" class="font-bold">...</h3><span id="badge-status" class="text-xs font-bold px-2 py-1 bg-gray-200 rounded">...</span></div>
                                 <input type="hidden" id="status-barang">
                                 <div id="lokasi-container" class="mt-2 space-y-2"></div>
                             </div>
-                            <!-- Qty Input -->
                             <div id="area-input-qty" class="hidden text-center pt-2">
                                 <div class="flex justify-center items-center gap-4 mb-4">
-                                    <button onclick="ubahQty(-1)" class="w-10 h-10 rounded-full bg-gray-200 font-bold">-</button>
-                                    <input type="number" id="input-qty" class="w-24 text-center text-3xl font-bold border-none outline-none" value="1">
-                                    <button onclick="ubahQty(1)" class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 font-bold">+</button>
+                                    <button onclick="ubahQty(-1)" class="w-10 h-10 rounded-full bg-gray-200 font-bold hover:bg-gray-300">-</button>
+                                    <input type="number" id="input-qty" class="w-24 text-center text-3xl font-bold border-none outline-none bg-transparent" value="1">
+                                    <button onclick="ubahQty(1)" class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 font-bold hover:bg-blue-200">+</button>
                                 </div>
                                 <div class="grid grid-cols-2 gap-2">
-                                    <button onclick="resetForm()" class="py-3 rounded bg-gray-100 font-bold text-gray-500">Batal</button>
-                                    <button onclick="simpanTemuan()" id="btn-simpan" class="py-3 rounded bg-green-600 text-white font-bold">Simpan</button>
+                                    <button onclick="resetForm()" class="py-3 rounded bg-gray-100 font-bold text-gray-500 hover:bg-gray-200">Batal</button>
+                                    <button onclick="simpanTemuan()" id="btn-simpan" class="py-3 rounded bg-green-600 text-white font-bold hover:bg-green-700 shadow-lg shadow-green-500/30">Simpan</button>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- HALAMAN LAPORAN VALID & NA -->
+                <!-- LAPORAN VALID (Filter Lengkap + Bulk + Edit) -->
                 <div id="halaman-laporan-valid" class="halaman hidden space-y-4">
-                    <div class="flex justify-between bg-white p-4 rounded shadow-sm items-center">
-                        <h2 class="font-bold text-green-700 flex items-center gap-2"><i class="ph ph-check-circle"></i> Data Valid</h2>
-                        <button onclick="loadLaporan('VALID')" class="bg-gray-100 p-2 rounded"><i class="ph ph-arrows-clockwise"></i></button>
+                    <div class="flex flex-col gap-4 bg-white p-4 rounded shadow-sm border border-gray-200">
+                        <div class="flex flex-col md:flex-row justify-between items-center border-b pb-3 gap-3">
+                            <h2 class="font-bold text-green-700 flex items-center gap-2"><i class="ph ph-check-circle text-xl"></i> Data Valid</h2>
+                            <div class="flex gap-2">
+                                <button onclick="printLaporan('table-valid')" class="bg-blue-600 text-white px-3 py-1.5 rounded text-sm font-bold hover:bg-blue-700 flex items-center gap-2 transition shadow-sm"><i class="ph ph-printer text-lg"></i> Print Custom</button>
+                                <button onclick="exportTableToExcel('table-valid', 'Laporan_Valid')" class="bg-green-600 text-white px-3 py-1.5 rounded text-sm font-bold hover:bg-green-700 flex items-center gap-2 transition shadow-sm"><i class="ph ph-microsoft-excel-logo text-lg"></i> Excel Custom</button>
+                            </div>
+                        </div>
+                        <!-- Toolbar Filter -->
+                        <div class="flex flex-wrap gap-2 items-center">
+                            <div class="flex-1 relative min-w-[200px]">
+                                <input type="text" id="search-valid" onkeyup="applyFilter('VALID')" placeholder="Cari Kode / ID Trx / Nama..." class="w-full border rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 ring-green-500 outline-none transition">
+                                <i class="ph ph-magnifying-glass absolute left-3 top-2.5 text-gray-400 text-lg"></i>
+                            </div>
+                            <div class="flex items-center gap-2 bg-gray-50 p-1 rounded-lg border">
+                                <input type="date" id="date-valid" onchange="applyFilter('VALID')" class="bg-transparent text-sm text-gray-600 focus:outline-none px-2">
+                                <button onclick="resetFilter('VALID')" class="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-white transition" title="Reset Filter"><i class="ph ph-x-circle text-lg"></i></button>
+                            </div>
+                            <button onclick="loadLaporan('VALID')" class="bg-gray-100 p-2 rounded-lg hover:bg-gray-200 text-gray-600 transition"><i class="ph ph-arrows-clockwise text-lg"></i></button>
+                        </div>
                     </div>
-                    <div class="bg-white rounded shadow-sm overflow-x-auto">
-                        <table class="w-full text-sm text-left"><thead class="bg-gray-100 font-bold border-b"><tr><th class="p-3">ID</th><th class="p-3">Code</th><th class="p-3">Qty</th><th class="p-3">Name</th><th class="p-3">Loc</th><th class="p-3">Time</th><th class="p-3">Act</th></tr></thead><tbody id="tbody-valid"></tbody></table>
+                    
+                    <div class="bg-white rounded shadow-sm overflow-x-auto border border-gray-200">
+                        <table id="table-valid" class="w-full text-sm text-left">
+                            <thead class="bg-gray-100 font-bold border-b border-gray-200 text-gray-600 uppercase text-xs">
+                                <tr>
+                                    <th class="p-3 w-10 text-center no-print"><input type="checkbox" onchange="toggleSelectAll('VALID', this)" class="rounded w-4 h-4 cursor-pointer accent-blue-600"></th>
+                                    <th class="p-3">ID Trx</th>
+                                    <th class="p-3">Kode Part</th>
+                                    <th class="p-3 text-center">Qty</th>
+                                    <th class="p-3">Nama Part</th>
+                                    <th class="p-3">Lokasi</th>
+                                    <th class="p-3">Waktu</th>
+                                    <th class="p-3 text-center no-print">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-valid" class="divide-y divide-gray-100"></tbody>
+                        </table>
                     </div>
                 </div>
 
+                <!-- LAPORAN NA (Filter Lengkap + Bulk + Edit) -->
                 <div id="halaman-laporan-na" class="halaman hidden space-y-4">
-                    <div class="flex justify-between bg-white p-4 rounded shadow-sm items-center">
-                        <h2 class="font-bold text-red-700 flex items-center gap-2"><i class="ph ph-warning-circle"></i> Data N/A</h2>
-                        <button onclick="loadLaporan('NA')" class="bg-gray-100 p-2 rounded"><i class="ph ph-arrows-clockwise"></i></button>
+                    <div class="flex flex-col gap-4 bg-white p-4 rounded shadow-sm border border-gray-200">
+                        <div class="flex flex-col md:flex-row justify-between items-center border-b pb-3 gap-3">
+                            <h2 class="font-bold text-red-700 flex items-center gap-2"><i class="ph ph-warning-circle text-xl"></i> Data N/A</h2>
+                            <div class="flex gap-2">
+                                <button onclick="printLaporan('table-na')" class="bg-blue-600 text-white px-3 py-1.5 rounded text-sm font-bold hover:bg-blue-700 flex items-center gap-2 transition shadow-sm"><i class="ph ph-printer text-lg"></i> Print Custom</button>
+                                <button onclick="exportTableToExcel('table-na', 'Laporan_NA')" class="bg-green-600 text-white px-3 py-1.5 rounded text-sm font-bold hover:bg-green-700 flex items-center gap-2 transition shadow-sm"><i class="ph ph-microsoft-excel-logo text-lg"></i> Excel Custom</button>
+                            </div>
+                        </div>
+                        <!-- Toolbar Filter -->
+                        <div class="flex flex-wrap gap-2 items-center">
+                            <div class="flex-1 relative min-w-[200px]">
+                                <input type="text" id="search-na" onkeyup="applyFilter('NA')" placeholder="Cari Kode / ID Trx..." class="w-full border rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 ring-red-500 outline-none transition">
+                                <i class="ph ph-magnifying-glass absolute left-3 top-2.5 text-gray-400 text-lg"></i>
+                            </div>
+                            <div class="flex items-center gap-2 bg-gray-50 p-1 rounded-lg border">
+                                <input type="date" id="date-na" onchange="applyFilter('NA')" class="bg-transparent text-sm text-gray-600 focus:outline-none px-2">
+                                <button onclick="resetFilter('NA')" class="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-white transition" title="Reset Filter"><i class="ph ph-x-circle text-lg"></i></button>
+                            </div>
+                            <button onclick="loadLaporan('NA')" class="bg-gray-100 p-2 rounded-lg hover:bg-gray-200 text-gray-600 transition"><i class="ph ph-arrows-clockwise text-lg"></i></button>
+                        </div>
                     </div>
-                    <div class="bg-white rounded shadow-sm overflow-x-auto">
-                        <table class="w-full text-sm text-left"><thead class="bg-red-50 font-bold border-b"><tr><th class="p-3">ID</th><th class="p-3">Scan</th><th class="p-3">Qty</th><th class="p-3">Time</th><th class="p-3">Act</th></tr></thead><tbody id="tbody-na"></tbody></table>
+                    
+                    <div class="bg-white rounded shadow-sm overflow-x-auto border border-gray-200">
+                        <table id="table-na" class="w-full text-sm text-left">
+                            <thead class="bg-red-50 font-bold border-b border-red-100 text-red-800 uppercase text-xs">
+                                <tr>
+                                    <th class="p-3 w-10 text-center no-print"><input type="checkbox" onchange="toggleSelectAll('NA', this)" class="rounded w-4 h-4 cursor-pointer accent-red-600"></th>
+                                    <th class="p-3">ID Trx</th>
+                                    <th class="p-3">Kode Scan</th>
+                                    <th class="p-3 text-center">Qty</th>
+                                    <th class="p-3">Waktu</th>
+                                    <th class="p-3 text-center no-print">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-na" class="divide-y divide-gray-100"></tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -147,7 +207,35 @@
         </main>
     </div>
 
-    <!-- TOAST NOTIFICATION -->
+    <!-- Modal Edit -->
+    <div id="modal-edit" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 transform scale-100 transition-transform">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><i class="ph ph-pencil-simple text-blue-600"></i> Edit Stok</h3>
+                <button onclick="tutupModalEdit()" class="text-gray-400 hover:text-gray-600"><i class="ph ph-x text-xl"></i></button>
+            </div>
+            
+            <input type="hidden" id="edit-dpack">
+            <input type="hidden" id="edit-type">
+            <input type="hidden" id="edit-idtrx">
+            
+            <div class="bg-gray-50 p-3 rounded-lg border mb-4">
+                <span class="text-xs text-gray-400 font-bold uppercase block">Kode Part</span>
+                <span id="display-edit-code" class="font-mono font-bold text-gray-700">...</span>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-xs font-bold text-gray-500 mb-1 ml-1 uppercase">Jumlah Baru</label>
+                <input type="number" id="edit-qty" class="w-full border-2 border-blue-100 rounded-xl p-3 text-3xl font-bold text-center focus:border-blue-500 outline-none transition text-gray-700">
+            </div>
+            
+            <div class="flex gap-3">
+                <button onclick="tutupModalEdit()" class="flex-1 py-3 rounded-xl text-gray-500 font-bold hover:bg-gray-100 transition">Batal</button>
+                <button onclick="prosesSimpanEdit()" class="flex-1 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/30 transition">Simpan Perubahan</button>
+            </div>
+        </div>
+    </div>
+
     <div id="toast" class="fixed bottom-6 right-6 px-6 py-4 rounded shadow-xl z-50 text-white translate-y-24 transition duration-300 font-bold bg-gray-800">Msg</div>
 
     <?!= include('JavaScript'); ?>
