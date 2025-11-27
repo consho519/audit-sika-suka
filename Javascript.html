@@ -5,92 +5,128 @@
 let currentUser = JSON.parse(localStorage.getItem('audit_user'));
 let currentCabang = localStorage.getItem('audit_cabang') || "";
 let selectedLokasi = null;
+let selectedItems = new Set(); // Menyimpan item yang dicentang {idTrx, code}
 
-// Jalankan saat halaman dimuat
+// INIT
 window.onload = function() {
-    // Cek apakah user sudah login sebelumnya
     if(currentUser) {
-        // Hapus layar login jika ada
-        const loginEl = document.getElementById('login-wrapper');
-        if(loginEl) loginEl.remove();
-        
-        // Masuk ke aplikasi utama
+        if(document.getElementById('login-wrapper')) document.getElementById('login-wrapper').remove();
         initApp();
     }
 };
 
-// Fungsi inisialisasi aplikasi setelah login
 function initApp() {
-    // Tampilkan container aplikasi dengan animasi halus
-    const appContainer = document.getElementById('app-container');
-    appContainer.classList.remove('hidden');
-    setTimeout(() => appContainer.classList.remove('opacity-0'), 50);
+    const app = document.getElementById('app-container');
+    app.classList.remove('hidden');
+    setTimeout(() => app.classList.remove('opacity-0'), 50);
 
-    // Refresh data user dari storage
     currentUser = JSON.parse(localStorage.getItem('audit_user'));
-    if(currentUser) {
-        document.getElementById('user-display-name').innerText = currentUser.username;
-        document.getElementById('user-display-role').innerText = currentUser.role;
-    }
+    document.getElementById('user-display-name').innerText = currentUser.username;
+    document.getElementById('user-display-role').innerText = currentUser.role;
 
-    // Muat daftar cabang dan set halaman awal
     loadDaftarCabang();
     navigasi('halaman-dashboard');
-}
-
-// Fungsi Logout
-function doLogout() {
-    if(confirm('Yakin ingin keluar aplikasi?')) {
-        localStorage.clear(); // Hapus sesi
-        location.reload();    // Reload agar kembali ke login
+    
+    // FIX RESPONSIVE: Paksa Bulk Bar jadi Fixed agar ikut scroll di HP
+    const bulkBar = document.getElementById('bulk-action-bar');
+    if(bulkBar) {
+        bulkBar.classList.remove('absolute');
+        bulkBar.classList.add('fixed');
     }
+
+    // OTOMATIS BUKA MENU "DATA TEMUAN" SAAT START
+    // Agar user langsung melihat menu di dalamnya tanpa perlu klik dulu
+    bukaMenuAwal();
+}
+
+function doLogout() {
+    if(confirm('Yakin ingin keluar?')) { localStorage.clear(); location.reload(); }
 }
 
 // ==========================================
-// 2. NAVIGASI HALAMAN & SIDEBAR
+// 2. NAVIGASI & SIDEBAR (UPDATED)
 // ==========================================
+
 function navigasi(id) {
     // Sembunyikan semua halaman
     document.querySelectorAll('.halaman').forEach(el => el.classList.add('hidden'));
+    document.getElementById(id).classList.remove('hidden');
     
-    // Tampilkan halaman target
-    const target = document.getElementById(id);
-    if(target) target.classList.remove('hidden');
-    
-    // Logika khusus saat membuka halaman tertentu
+    // Refresh data dashboard atau laporan
     if(id === 'halaman-dashboard') refreshDashboard();
     if(id.includes('laporan')) { 
-        loadLaporan('VALID'); 
-        loadLaporan('NA'); 
+        resetFilter('VALID'); resetFilter('NA');
+        clearSelection();
+        loadLaporan('VALID'); loadLaporan('NA'); 
     }
+    
+    // Sembunyikan Bulk Bar saat pindah halaman
+    document.getElementById('bulk-action-bar').classList.add('hidden');
 
-    // Tutup sidebar mobile jika sedang terbuka
+    // RESPONSIVE: Tutup sidebar mobile otomatis jika link diklik
     const mobileSidebar = document.getElementById('mobile-sidebar');
     if(mobileSidebar && !mobileSidebar.classList.contains('-translate-x-full')) {
         toggleSidebar();
     }
 }
 
-// Toggle Sidebar Mobile
 function toggleSidebar() {
     const s = document.getElementById('mobile-sidebar');
     const b = document.getElementById('mobile-sidebar-backdrop');
-    
-    if(s.classList.contains('-translate-x-full')) {
-        // Buka
-        s.classList.remove('-translate-x-full'); 
-        b.classList.remove('hidden');
+    s.classList.toggle('-translate-x-full'); 
+    b.classList.toggle('hidden');
+}
+
+function toggleDesktopSidebar() {
+    const s = document.getElementById('desktop-sidebar');
+    // Logika Shrink/Expand Sidebar Desktop
+    if (s.classList.contains('w-64')) {
+        s.classList.remove('w-64');
+        s.classList.add('w-0');
+        s.classList.add('opacity-0'); 
     } else {
-        // Tutup
-        s.classList.add('-translate-x-full'); 
-        b.classList.add('hidden');
+        s.classList.remove('w-0');
+        s.classList.remove('opacity-0');
+        s.classList.add('w-64');
     }
 }
 
-// Toggle Sidebar Desktop (Minimize)
-function toggleDesktopSidebar() {
-    const s = document.getElementById('desktop-sidebar');
-    s.classList.toggle('hidden');
+/**
+ * Fungsi Baru: Mengatur Buka/Tutup Sub-Menu (Dropdown)
+ * @param {string} menuId - ID div container sub-menu
+ * @param {string} arrowId - ID icon panah
+ */
+function toggleSubmenu(menuId, arrowId) {
+    const menu = document.getElementById(menuId);
+    const arrow = document.getElementById(arrowId);
+    
+    if (menu.classList.contains('hidden')) {
+        menu.classList.remove('hidden'); // Buka
+        arrow.classList.add('rotate-180'); // Panah putar ke atas
+    } else {
+        menu.classList.add('hidden'); // Tutup
+        arrow.classList.remove('rotate-180'); // Panah putar ke bawah
+    }
+}
+
+/**
+ * Fungsi Baru: Membuka menu "DATA TEMUAN" secara otomatis saat aplikasi dimuat
+ */
+function bukaMenuAwal() {
+    // Daftar ID menu dan panah yang ingin dibuka default
+    const ids = [
+        {m: 'sub-desktop-temuan', a: 'arrow-desktop-temuan'},
+        {m: 'sub-mobile-temuan', a: 'arrow-mobile-temuan'}
+    ];
+    
+    ids.forEach(item => {
+        const menu = document.getElementById(item.m);
+        const arrow = document.getElementById(item.a);
+        if(menu && arrow) {
+            menu.classList.remove('hidden');
+            arrow.classList.add('rotate-180');
+        }
+    });
 }
 
 // ==========================================
@@ -100,20 +136,11 @@ function loadDaftarCabang() {
     google.script.run.withSuccessHandler(res => {
         const sel = document.getElementById('pilih-cabang');
         sel.innerHTML = '<option value="" disabled selected>Pilih Cabang...</option>';
-        
         res.list.forEach(c => {
-            let opt = document.createElement('option');
-            opt.value = c; 
-            opt.innerText = c;
-            sel.appendChild(opt);
+            let opt = document.createElement('option'); opt.value = c; opt.innerText = c; sel.appendChild(opt);
         });
-
-        // Auto-select jika ada histori cabang
-        if(currentCabang && res.list.includes(currentCabang)) {
-            sel.value = currentCabang;
-            updateUIBranch();
-        }
-    }).getDaftarCabang(currentUser ? currentUser.username : "");
+        if(currentCabang && res.list.includes(currentCabang)) { sel.value = currentCabang; updateUIBranch(); }
+    }).getDaftarCabang(currentUser.username);
 }
 
 function gantiCabang(val) {
@@ -121,148 +148,94 @@ function gantiCabang(val) {
     localStorage.setItem('audit_cabang', val);
     updateUIBranch();
     showToast("Cabang aktif: " + val);
-    refreshDashboard(); // Refresh data dashboard sesuai cabang baru
+    refreshDashboard();
 }
 
 function updateUIBranch() {
-    const infoEl = document.getElementById('dash-cabang-info');
-    if(infoEl) infoEl.innerText = currentCabang;
+    document.getElementById('dash-cabang-info').innerText = currentCabang;
 }
 
 // ==========================================
-// 4. OPERASIONAL (PENCARIAN & INPUT)
+// 4. INPUT & SCAN OPERASIONAL
 // ==========================================
-function handleEnter(e) { 
-    if(e.key === 'Enter') cariBarang(); 
-}
+function handleEnter(e) { if(e.key === 'Enter') cariBarang(); }
 
 function cariBarang() {
-    if(!currentCabang) return showToast("Harap pilih Cabang terlebih dahulu!");
-    
-    const dpackEl = document.getElementById('input-dpack');
-    const dpack = dpackEl.value.trim();
-    if(!dpack) return showToast("Scan atau ketik kode barang!");
+    if(!currentCabang) return showToast("Pilih Cabang dulu!");
+    const dpack = document.getElementById('input-dpack').value;
+    if(!dpack) return;
 
-    // UI State: Loading
     document.getElementById('loading-cari').classList.remove('hidden');
     document.getElementById('area-detail').classList.add('hidden');
     document.getElementById('area-input-qty').classList.add('hidden');
-    dpackEl.disabled = true;
+    document.getElementById('input-dpack').disabled = true;
+    selectedLokasi = null;
 
-    selectedLokasi = null; // Reset lokasi terpilih
-
-    // Panggil Backend
     google.script.run.withSuccessHandler(res => {
-        // UI State: Selesai Loading
         document.getElementById('loading-cari').classList.add('hidden');
         document.getElementById('area-detail').classList.remove('hidden');
         document.getElementById('area-input-qty').classList.remove('hidden');
         
         const cont = document.getElementById('lokasi-container');
         const badge = document.getElementById('badge-status');
-        const namaPart = document.getElementById('hasil-part-number');
-        const statusInp = document.getElementById('status-barang');
-        
-        cont.innerHTML = ''; // Bersihkan hasil sebelumnya
+        cont.innerHTML = '';
 
         if(res.found) {
-            // --- BARANG VALID ---
-            namaPart.innerText = res.partNumber;
-            statusInp.value = 'VALID';
-            badge.innerText = "VALID"; 
-            badge.className = "text-xs font-bold px-2 py-1 bg-green-100 text-green-700 rounded border border-green-200";
+            document.getElementById('hasil-part-number').innerText = res.partNumber;
+            document.getElementById('status-barang').value = 'VALID';
+            badge.innerText = "VALID";
+            badge.className = "text-xs font-bold px-2 py-1 bg-green-100 text-green-700 rounded";
             
-            // Render Pilihan Lokasi
-            res.items.forEach((item, idx) => {
+            res.items.forEach(item => {
                 let div = document.createElement('div');
-                div.className = "lokasi-item p-3 border rounded-xl cursor-pointer hover:bg-blue-50 flex justify-between items-center transition-all mb-2";
-                div.innerHTML = `
-                    <div>
-                        <div class='text-[10px] font-bold text-gray-400 uppercase'>Lokasi</div>
-                        <div class='font-bold text-gray-800 text-lg'>${item.lokasi}</div>
-                    </div>
-                    <div class='text-right'>
-                        <div class='text-[10px] font-bold text-gray-400 uppercase'>Sistem</div>
-                        <div class='font-bold text-blue-600 text-lg'>${item.stockSistem}</div>
-                    </div>
-                `;
+                div.className = "p-3 border rounded cursor-pointer hover:bg-blue-50 flex justify-between lokasi-item";
+                div.innerHTML = `<div><div class='text-xs text-gray-400'>Lokasi</div><div class='font-bold'>${item.lokasi}</div></div><div class='text-right'><div class='text-xs text-gray-400'>Stok</div><div class='font-bold text-blue-600'>${item.stockSistem}</div></div>`;
                 div.onclick = function() { pilihLokasi(item.lokasi, this); };
                 cont.appendChild(div);
             });
-            
-            // Otomatis pilih lokasi pertama jika ada
             if(res.items.length > 0) pilihLokasi(res.items[0].lokasi, cont.firstChild);
-
         } else {
-            // --- BARANG NA / UNKNOWN ---
-            namaPart.innerText = "Tidak Dikenal (Unknown)";
-            statusInp.value = 'NA';
-            badge.innerText = "N/A"; 
-            badge.className = "text-xs font-bold px-2 py-1 bg-red-100 text-red-700 rounded border border-red-200";
-            
-            cont.innerHTML = `
-                <div class='bg-red-50 p-3 rounded-xl border border-red-100 text-red-600 text-sm flex items-center gap-2'>
-                    <i class="ph ph-warning-circle text-lg"></i>
-                    Barang tidak ditemukan di Master Database.
-                </div>`;
+            document.getElementById('hasil-part-number').innerText = "Tidak Dikenal";
+            document.getElementById('status-barang').value = 'NA';
+            badge.innerText = "N/A";
+            badge.className = "text-xs font-bold px-2 py-1 bg-red-100 text-red-700 rounded";
+            cont.innerHTML = "<div class='text-red-500 text-sm'>Barang tidak ada di Master</div>";
             selectedLokasi = "UNKNOWN";
         }
-        
-        // Fokus ke input Qty
         const iQty = document.getElementById('input-qty');
-        iQty.value = 1;
-        iQty.focus();
-        iQty.select();
-
+        iQty.value = 1; iQty.focus(); iQty.select();
     }).cariBarangDiMaster(dpack, currentCabang);
 }
 
-// Fungsi helper saat memilih lokasi rak
 function pilihLokasi(loc, el) {
     selectedLokasi = loc;
-    // Reset style semua item
-    document.querySelectorAll('.lokasi-item').forEach(x => {
-        x.classList.remove('bg-blue-50', 'border-blue-500', 'ring-1', 'ring-blue-500');
-        x.classList.add('border-gray-200');
-    });
-    // Highlight item terpilih
-    el.classList.remove('border-gray-200');
-    el.classList.add('bg-blue-50', 'border-blue-500', 'ring-1', 'ring-blue-500');
+    document.querySelectorAll('.lokasi-item').forEach(x => x.classList.remove('bg-blue-100', 'border-blue-500'));
+    el.classList.add('bg-blue-100', 'border-blue-500');
 }
 
-// Fungsi helper tombol +/- qty
 function ubahQty(n) {
     let el = document.getElementById('input-qty');
     let v = parseInt(el.value) || 0;
     if(v + n > 0) el.value = v + n;
 }
 
-// Reset form input scan
 function resetForm() {
-    const dpackEl = document.getElementById('input-dpack');
-    dpackEl.value = '';
-    dpackEl.disabled = false;
-    
+    const d = document.getElementById('input-dpack');
+    d.value = ''; d.disabled = false; d.focus();
     document.getElementById('area-detail').classList.add('hidden');
     document.getElementById('area-input-qty').classList.add('hidden');
-    
-    dpackEl.focus();
 }
 
-// Fungsi Simpan Data
 function simpanTemuan() {
-    const trx = document.getElementById('input-id-trx').value.trim();
-    if(!trx) return showToast("Wajib mengisi ID Transaksi (SPK)!");
+    const trx = document.getElementById('input-id-trx').value;
+    if(!trx) return showToast("Isi ID Transaksi!");
     
     const status = document.getElementById('status-barang').value;
-    if(status === 'VALID' && !selectedLokasi) return showToast("Harap pilih Lokasi Rak!");
+    if(status === 'VALID' && !selectedLokasi) return showToast("Pilih Lokasi!");
 
     const btn = document.getElementById('btn-simpan');
-    const originalText = btn.innerHTML;
-    
-    // UI Loading Simpan
-    btn.disabled = true; 
-    btn.innerHTML = `<i class="ph ph-spinner animate-spin text-xl"></i> Menyimpan...`;
+    const txt = btn.innerText;
+    btn.disabled = true; btn.innerText = "Simpan...";
 
     const data = {
         cabang: currentCabang,
@@ -275,116 +248,83 @@ function simpanTemuan() {
     };
 
     google.script.run.withSuccessHandler(res => {
-        btn.disabled = false; 
-        btn.innerHTML = originalText;
-        
-        if(res.success) {
-            showToast("Data berhasil disimpan!", "success");
-            resetForm();
-        } else {
-            showToast("Gagal menyimpan: " + res.message);
-        }
+        btn.disabled = false; btn.innerText = txt;
+        if(res.success) { showToast("Tersimpan!"); resetForm(); }
+        else { showToast("Gagal: " + res.message); }
     }).simpanDataTemuan(data);
 }
 
 // ==========================================
 // 5. LAPORAN & DASHBOARD
 // ==========================================
+
 function refreshDashboard() {
     if(!currentCabang) return;
-    
     google.script.run.withSuccessHandler(d => {
-        // Update Angka Statistik
         document.getElementById('dash-total-qty').innerText = d.totalQty;
         document.getElementById('dash-valid-sku').innerText = d.validSKU;
         document.getElementById('dash-na-sku').innerText = d.naSKU;
         document.getElementById('dash-valid-qty-detail').innerText = d.validQty + " Pcs";
         document.getElementById('dash-na-qty-detail').innerText = d.naQty + " Pcs";
-        
-        // Update Tabel Aktivitas Terakhir
         const list = document.getElementById('dash-activity-list');
         list.innerHTML = '';
-        
-        if(d.recent.length === 0) {
-            list.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-400 text-xs">Belum ada aktivitas</td></tr>`;
-        } else {
-            d.recent.forEach(r => {
-                let colorClass = r.type==='VALID' ? 'text-gray-700' : 'text-red-600 font-bold';
-                let typeBadge = r.type==='VALID' 
-                    ? '<span class="w-2 h-2 rounded-full bg-green-500 inline-block mr-1"></span>' 
-                    : '<span class="w-2 h-2 rounded-full bg-red-500 inline-block mr-1"></span>';
-                    
-                list.innerHTML += `
-                    <tr class='border-b hover:bg-gray-50 transition'>
-                        <td class='p-3 ${colorClass} text-xs font-mono'>
-                            ${typeBadge}${r.dpack}
-                        </td>
-                        <td class='p-3 text-right font-bold text-sm'>${r.qty}</td>
-                        <td class='p-3 text-right text-[10px] text-gray-400 font-mono'>
-                            ${new Date(r.time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                        </td>
-                    </tr>`;
-            });
-        }
+        d.recent.forEach(r => {
+            let color = r.type==='VALID' ? 'text-gray-600' : 'text-red-500';
+            list.innerHTML += `<tr class='border-b'><td class='p-3 ${color}'>${r.dpack}</td><td class='p-3 text-right font-bold'>${r.qty}</td><td class='p-3 text-right text-xs text-gray-400'>${new Date(r.time).toLocaleTimeString()}</td></tr>`;
+        });
     }).getDashboardStats(currentCabang);
 }
 
 function loadLaporan(type) {
     if(!currentCabang) return;
-    
     const tbody = document.getElementById(type==='VALID' ? 'tbody-valid' : 'tbody-na');
-    const colSpan = type==='VALID' ? 7 : 5;
+    const colSpan = type==='VALID' ? 8 : 6; // 8 kolom karena ada Checkbox
     
-    // Tampilkan Loading State
-    tbody.innerHTML = `<tr><td colspan='${colSpan}' class='p-8 text-center text-gray-400'><i class="ph ph-spinner animate-spin text-2xl mb-2"></i><br>Memuat Data...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan='${colSpan}' class='p-8 text-center text-gray-400'>Loading...</td></tr>`;
     
     google.script.run.withSuccessHandler(rows => {
         tbody.innerHTML = '';
-        
         if(rows.length === 0) {
-            tbody.innerHTML = `<tr><td colspan='${colSpan}' class='p-8 text-center text-gray-400 italic'>Belum ada data</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan='${colSpan}' class='p-8 text-center text-gray-400 italic'>Kosong</td></tr>`;
             return;
         }
         
         rows.forEach(r => {
-            // NOTE: r[0] adalah Nama Cabang. Kita skip tampilkan di tabel karena user sudah tau dia di cabang mana.
+            // Buat unique key untuk checkbox (ID|Code)
+            let uniqueKey = `${r[1]}|${r[2]}`;
             
-            let html = `<tr class='border-b hover:bg-gray-50 transition group'>`;
+            let html = `<tr class='border-b hover:bg-gray-50 group transition row-data'>
+                <!-- Checkbox untuk Bulk Action -->
+                <td class='p-3 text-center no-print'>
+                    <input type="checkbox" class="row-check rounded w-4 h-4 accent-blue-600 cursor-pointer" value="${uniqueKey}" onchange="handleCheck('${type}')">
+                </td>`;
             
             if(type === 'VALID') {
-                // Mapping Valid: r[1]=ID, r[2]=Code, r[3]=Qty, r[4]=Name, r[5]=Loc, r[6]=Time
+                // r[1]=ID, r[2]=Code, r[3]=Qty, r[4]=Name, r[5]=Loc, r[6]=Time
                 html += `
                     <td class='p-3 font-mono text-xs text-gray-500'>${r[1]}</td>
-                    <td class='p-3 font-bold text-sm text-gray-800'>${r[2]}</td>
+                    <td class='p-3 font-bold'>${r[2]}</td>
                     <td class='p-3 font-bold text-blue-600 text-center bg-blue-50/50 rounded'>${r[3]}</td>
-                    <td class='p-3 text-xs text-gray-600 max-w-[150px] truncate' title="${r[4]}">${r[4]}</td>
-                    <td class='p-3 text-xs'>
-                        <span class="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded font-bold">${r[5]}</span>
-                    </td>
-                    <td class='p-3 text-[10px] text-gray-400 font-mono'>
-                        ${new Date(r[6]).toLocaleString([], {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})}
-                    </td>
-                    <td class='p-3 text-center'>
-                         <button onclick="hapusItem('${r[2]}','VALID','${r[1]}')" class="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition" title="Hapus">
-                            <i class="ph ph-trash text-lg"></i>
-                         </button>
-                    </td>
-                `;
+                    <td class='p-3 text-sm'>${r[4]}</td>
+                    <td class='p-3 text-xs bg-yellow-50'>${r[5]}</td>
+                    <td class='p-3 text-[10px] text-gray-400 font-mono'>${new Date(r[6]).toLocaleString()}</td>
+                    <!-- Kolom Aksi: Edit & Hapus -->
+                    <td class='p-3 text-center no-print flex justify-center gap-1'>
+                         <button onclick="bukaEdit('${r[2]}','${r[3]}','VALID','${r[1]}')" class="text-blue-400 hover:bg-blue-50 p-1.5 rounded transition" title="Edit"><i class="ph ph-pencil-simple text-lg"></i></button>
+                         <button onclick="hapusItem('${r[2]}','VALID','${r[1]}')" class="text-red-400 hover:bg-red-50 p-1.5 rounded transition" title="Hapus"><i class="ph ph-trash text-lg"></i></button>
+                    </td>`;
             } else {
-                // Mapping NA: r[1]=ID, r[2]=Code, r[3]=Qty, r[4]=Time
+                // r[1]=ID, r[2]=Code, r[3]=Qty, r[4]=Time
                 html += `
                     <td class='p-3 font-mono text-xs text-gray-500'>${r[1]}</td>
-                    <td class='p-3 font-bold text-red-600 text-sm'>${r[2]}</td>
+                    <td class='p-3 font-bold text-red-600'>${r[2]}</td>
                     <td class='p-3 font-bold text-center bg-red-50/50 rounded'>${r[3]}</td>
-                    <td class='p-3 text-[10px] text-gray-400 font-mono'>
-                        ${new Date(r[4]).toLocaleString([], {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})}
-                    </td>
-                    <td class='p-3 text-center'>
-                         <button onclick="hapusItem('${r[2]}','NA','${r[1]}')" class="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition" title="Hapus">
-                            <i class="ph ph-trash text-lg"></i>
-                         </button>
-                    </td>
-                `;
+                    <td class='p-3 text-[10px] text-gray-400 font-mono'>${new Date(r[4]).toLocaleString()}</td>
+                    <!-- Kolom Aksi: Edit & Hapus -->
+                    <td class='p-3 text-center no-print flex justify-center gap-1'>
+                         <button onclick="bukaEdit('${r[2]}','${r[3]}','NA','${r[1]}')" class="text-blue-400 hover:bg-blue-50 p-1.5 rounded transition" title="Edit"><i class="ph ph-pencil-simple text-lg"></i></button>
+                         <button onclick="hapusItem('${r[2]}','NA','${r[1]}')" class="text-red-400 hover:bg-red-50 p-1.5 rounded transition" title="Hapus"><i class="ph ph-trash text-lg"></i></button>
+                    </td>`;
             }
             html += `</tr>`;
             tbody.innerHTML += html;
@@ -392,48 +332,240 @@ function loadLaporan(type) {
     }).getLaporanData(type, currentCabang);
 }
 
-// Fungsi Hapus Item dari Tabel
+// ==========================================
+// 6. SINGLE EDIT & DELETE
+// ==========================================
+
 function hapusItem(dpack, type, idTrx) {
-    if(confirm('Apakah Anda yakin ingin menghapus data ini secara PERMANEN?')) {
-        google.script.run.withSuccessHandler(r => {
-            if(r.success) { 
-                showToast("Data berhasil dihapus", "success"); 
-                loadLaporan(type); 
-                refreshDashboard(); 
-            } else { 
-                showToast("Gagal menghapus data", "error"); 
-            }
+    if(confirm('Hapus data ini permanen?')) {
+        google.script.run.withSuccessHandler(r=>{
+            if(r.success) { showToast("Terhapus"); loadLaporan(type); refreshDashboard(); }
+            else { showToast("Gagal Hapus"); }
         }).hapusItem(dpack, type, currentCabang, idTrx);
     }
 }
 
+function bukaEdit(dpack, qty, type, idTrx) {
+    document.getElementById('modal-edit').classList.remove('hidden');
+    document.getElementById('display-edit-code').innerText = dpack;
+    document.getElementById('edit-dpack').value = dpack;
+    document.getElementById('edit-qty').value = qty;
+    document.getElementById('edit-type').value = type;
+    document.getElementById('edit-idtrx').value = idTrx;
+    setTimeout(() => document.getElementById('edit-qty').select(), 100);
+}
+
+function tutupModalEdit() { document.getElementById('modal-edit').classList.add('hidden'); }
+
+function prosesSimpanEdit() {
+    let d = document.getElementById('edit-dpack').value;
+    let q = document.getElementById('edit-qty').value;
+    let t = document.getElementById('edit-type').value;
+    let i = document.getElementById('edit-idtrx').value;
+    
+    tutupModalEdit();
+    
+    google.script.run.withSuccessHandler(r => {
+        if(r.success) { showToast("Update Berhasil"); loadLaporan(t); refreshDashboard(); }
+        else { showToast("Gagal Update: " + r.message, "error"); }
+    }).editItem(d, q, t, currentCabang, i);
+}
+
 // ==========================================
-// 6. UTILITIES
+// 7. FILTER & SELECTION LOGIC
 // ==========================================
+
+function applyFilter(type) {
+    const txt = document.getElementById('search-'+type.toLowerCase()).value.toLowerCase();
+    const dateVal = document.getElementById('date-'+type.toLowerCase()).value;
+    const table = document.getElementById('table-'+type.toLowerCase());
+    const rows = table.getElementsByTagName('tr');
+
+    for(let i=1; i<rows.length; i++) {
+        const cells = rows[i].getElementsByTagName('td');
+        if(cells.length < 3) continue;
+
+        let textMatch = false;
+        let dateMatch = true;
+
+        let rowText = "";
+        for(let j=1; j<cells.length-1; j++) rowText += cells[j].innerText.toLowerCase() + " ";
+        
+        if(rowText.includes(txt)) textMatch = true;
+
+        if(dateVal) {
+            let dateIdx = type === 'VALID' ? 6 : 4;
+            let rowDateStr = cells[dateIdx].innerText; 
+            let dObj = new Date(rowDateStr);
+            if(!isNaN(dObj.getTime())) {
+                let y = dObj.getFullYear();
+                let m = String(dObj.getMonth()+1).padStart(2,'0');
+                let d = String(dObj.getDate()).padStart(2,'0');
+                let isoDate = `${y}-${m}-${d}`;
+                
+                if(isoDate !== dateVal) dateMatch = false;
+            }
+        }
+
+        rows[i].style.display = (textMatch && dateMatch) ? "" : "none";
+    }
+    
+    handleCheck(type);
+}
+
+function resetFilter(type) {
+    document.getElementById('search-'+type.toLowerCase()).value = "";
+    document.getElementById('date-'+type.toLowerCase()).value = "";
+    applyFilter(type);
+}
+
+// Checkbox Logic
+function toggleSelectAll(type, el) {
+    const table = document.getElementById('table-'+type.toLowerCase());
+    const checkboxes = table.querySelectorAll('.row-check');
+    checkboxes.forEach(cb => {
+        if(cb.closest('tr').style.display !== 'none') {
+            cb.checked = el.checked;
+        }
+    });
+    handleCheck(type);
+}
+
+function handleCheck(type) {
+    selectedItems.clear();
+    const activeTab = !document.getElementById('halaman-laporan-valid').classList.contains('hidden') ? 'VALID' : 'NA';
+    if(type !== activeTab) return;
+
+    const table = document.getElementById('table-'+type.toLowerCase());
+    const checkboxes = table.querySelectorAll('.row-check:checked');
+    
+    checkboxes.forEach(cb => {
+        let val = cb.value.split('|'); // ID|Code
+        selectedItems.add({idTrx: val[0], code: val[1]});
+    });
+
+    const bar = document.getElementById('bulk-action-bar');
+    if(selectedItems.size > 0) {
+        bar.classList.remove('hidden');
+        document.getElementById('selected-count').innerText = selectedItems.size;
+    } else {
+        bar.classList.add('hidden');
+    }
+}
+
+function clearSelection() {
+    document.querySelectorAll('.row-check').forEach(cb => cb.checked = false);
+    selectedItems.clear();
+    document.getElementById('bulk-action-bar').classList.add('hidden');
+}
+
+// Bulk Actions
+function bulkDelete() {
+    if(!confirm(`Hapus ${selectedItems.size} item terpilih?`)) return;
+    
+    const type = !document.getElementById('halaman-laporan-valid').classList.contains('hidden') ? 'VALID' : 'NA';
+    const items = Array.from(selectedItems); 
+
+    google.script.run.withSuccessHandler(r => {
+        if(r.success) {
+            showToast(r.message, "success");
+            clearSelection();
+            loadLaporan(type);
+            refreshDashboard();
+        } else {
+            showToast(r.message, "error");
+        }
+    }).prosesBulkAction(currentCabang, type, 'DELETE', items, null);
+}
+
+function bulkEdit() {
+    let newQty = prompt(`Masukkan Qty baru untuk ${selectedItems.size} item ini:`);
+    if(newQty === null || newQty.trim() === "") return;
+    
+    const type = !document.getElementById('halaman-laporan-valid').classList.contains('hidden') ? 'VALID' : 'NA';
+    const items = Array.from(selectedItems);
+
+    google.script.run.withSuccessHandler(r => {
+        if(r.success) {
+            showToast(r.message, "success");
+            clearSelection();
+            loadLaporan(type);
+            refreshDashboard();
+        } else {
+            showToast(r.message, "error");
+        }
+    }).prosesBulkAction(currentCabang, type, 'EDIT_QTY', items, {qty: newQty});
+}
+
+// ==========================================
+// 8. PRINT & EXPORT (SMART)
+// ==========================================
+
+function printLaporan(tableId) {
+    if(selectedItems.size > 0) {
+        const table = document.getElementById(tableId);
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach(r => {
+            const cb = r.querySelector('.row-check');
+            if(cb && !cb.checked) r.classList.add('hidden-print-temp');
+        });
+        window.print();
+        rows.forEach(r => r.classList.remove('hidden-print-temp'));
+    } else {
+        window.print();
+    }
+}
+
+function exportTableToExcel(tableId, filename) {
+    const tableSelect = document.getElementById(tableId);
+    const tableClone = tableSelect.cloneNode(true);
+    const rows = tableClone.querySelectorAll('tr');
+    
+    for(let i=rows.length-1; i>=0; i--) {
+        const r = rows[i];
+        
+        if(r.style.display === 'none') {
+            r.remove(); continue;
+        }
+        
+        if(selectedItems.size > 0 && i > 0) { 
+             const originalRow = tableSelect.rows[i];
+             const cb = originalRow.querySelector('.row-check');
+             if(cb && !cb.checked) {
+                 r.remove(); continue;
+             }
+        }
+
+        const cells = r.querySelectorAll('th, td');
+        if(cells.length > 0) {
+            cells[cells.length-1].remove(); // Hapus Aksi
+            cells[0].remove();              // Hapus Checkbox
+        }
+    }
+
+    let tableHTML = tableClone.outerHTML.replace(/ /g, '%20');
+    let downloadLink = document.createElement("a");
+    document.body.appendChild(downloadLink);
+    
+    filename = filename + '.xls';
+    let dataType = 'application/vnd.ms-excel';
+    
+    if(navigator.msSaveOrOpenBlob){
+        var blob = new Blob(['\ufeff', tableHTML], { type: dataType });
+        navigator.msSaveOrOpenBlob( blob, filename);
+    } else {
+        downloadLink.href = 'data:' + dataType + ', ' + tableHTML;
+        downloadLink.download = filename;
+        downloadLink.click();
+    }
+    document.body.removeChild(downloadLink);
+}
+
 function showToast(msg, type = 'normal') {
     const t = document.getElementById('toast');
     t.innerText = msg;
-    
-    // Reset classes
-    t.className = "fixed bottom-6 right-6 px-6 py-4 rounded-xl shadow-2xl z-50 text-white font-bold transition duration-300 translate-y-24";
-    
-    // Set warna berdasarkan tipe
-    if(type === 'success') {
-        t.classList.add('bg-green-600');
-    } else if(type === 'error') {
-        t.classList.add('bg-red-600');
-    } else {
-        t.classList.add('bg-gray-800');
-    }
-    
-    // Tampilkan (Slide Up)
-    requestAnimationFrame(() => {
-        t.classList.remove('translate-y-24');
-    });
-
-    // Sembunyikan otomatis setelah 3 detik
-    setTimeout(() => {
-        t.classList.add('translate-y-24');
-    }, 3000);
+    t.className = `fixed bottom-6 right-6 px-6 py-4 rounded-xl shadow-2xl z-50 text-white font-bold transition duration-300 translate-y-24 ${type==='error'?'bg-red-600':(type==='success'?'bg-green-600':'bg-gray-800')}`;
+    requestAnimationFrame(() => t.classList.remove('translate-y-24'));
+    setTimeout(() => t.classList.add('translate-y-24'), 3000);
 }
 </script>
