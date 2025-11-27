@@ -1,0 +1,126 @@
+<div id="login-wrapper" class="fixed inset-0 z-[9999] bg-gray-100 flex items-center justify-center font-sans">
+    <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm mx-4 transform transition-all relative overflow-hidden">
+        
+        <!-- Hiasan Background Blur -->
+        <div class="absolute -top-10 -right-10 w-32 h-32 bg-blue-100 rounded-full opacity-50 blur-2xl pointer-events-none"></div>
+        <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-indigo-100 rounded-full opacity-50 blur-2xl pointer-events-none"></div>
+
+        <div class="text-center mb-6 relative z-10">
+            <div class="w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center mx-auto mb-4 text-white shadow-lg shadow-blue-300 transform hover:rotate-3 transition-transform duration-300">
+                <i class="ph ph-shield-check text-5xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800 tracking-tight">Audit Suka Suka</h1>
+            <p class="text-xs text-gray-500 mt-1 font-medium">Silakan masuk untuk memulai sesi</p>
+        </div>
+
+        <form onsubmit="handleLogin(event)" class="space-y-5 relative z-10">
+            <div>
+                <label class="text-xs font-bold text-gray-500 uppercase ml-1 mb-1 block">Username</label>
+                <div class="relative group">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                        <i class="ph ph-user text-xl"></i>
+                    </span>
+                    <input type="text" id="user-login" class="w-full border border-gray-200 rounded-xl py-3 pl-10 pr-4 bg-gray-50 text-gray-800 font-medium focus:bg-white outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all placeholder-gray-400" placeholder="Username" required autocomplete="off">
+                </div>
+            </div>
+            <div>
+                <label class="text-xs font-bold text-gray-500 uppercase ml-1 mb-1 block">Password</label>
+                <div class="relative group">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                        <i class="ph ph-lock-key text-xl"></i>
+                    </span>
+                    <input type="password" id="pass-login" class="w-full border border-gray-200 rounded-xl py-3 pl-10 pr-4 bg-gray-50 text-gray-800 font-medium focus:bg-white outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all placeholder-gray-400" placeholder="••••••" required>
+                </div>
+            </div>
+            
+            <button type="submit" id="btn-login" class="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 transition-all transform active:scale-95 flex justify-center items-center gap-2">
+                <span>MASUK SISTEM</span>
+                <i class="ph ph-arrow-right font-bold"></i>
+            </button>
+        </form>
+
+        <div class="mt-8 text-center border-t border-gray-100 pt-4">
+            <p class="text-[10px] text-gray-400 font-medium flex justify-center items-center gap-1">
+                <i class="ph ph-lock-simple"></i> Koneksi Aman Terenkripsi
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * Menangani proses login user
+ */
+function handleLogin(e) {
+    e.preventDefault();
+    
+    const u = document.getElementById('user-login').value.trim();
+    const p = document.getElementById('pass-login').value.trim();
+    const btn = document.getElementById('btn-login');
+    const originalText = btn.innerHTML;
+
+    if(!u || !p) {
+        alert("Harap isi username dan password!");
+        return;
+    }
+
+    // Efek Loading UI
+    btn.disabled = true; 
+    btn.innerHTML = `<i class="ph ph-spinner animate-spin text-xl"></i> Memproses...`;
+    btn.classList.add('opacity-75', 'cursor-not-allowed');
+
+    // Panggil Backend Api.gs -> loginUser()
+    google.script.run.withSuccessHandler(res => {
+        if(res.success) {
+            // 1. Simpan sesi ke LocalStorage Browser
+            // Data ini nanti dipakai oleh JavaScript.html untuk inisialisasi App
+            localStorage.setItem('audit_user', JSON.stringify({
+                username: res.user, 
+                role: res.role
+            }));
+            
+            // Jika user punya default cabang, simpan juga
+            if(res.cabang) localStorage.setItem('audit_cabang', res.cabang);
+            
+            // 2. Animasi Keluar Layar Login
+            const w = document.getElementById('login-wrapper');
+            w.style.transition = "opacity 0.5s ease, transform 0.5s ease";
+            w.style.opacity = '0';
+            w.style.transform = 'scale(1.1)'; // Zoom out sedikit
+            
+            setTimeout(() => {
+                w.remove(); // Hapus elemen login dari DOM
+                
+                // 3. Masuk ke Aplikasi Utama
+                // Fungsi initApp() ada di file JavaScript.html
+                if(typeof initApp === 'function') {
+                    initApp(); 
+                } else {
+                    console.error("Fungsi initApp belum dimuat, reload halaman...");
+                    location.reload();
+                }
+            }, 500);
+
+        } else {
+            // Login Gagal
+            alert("Gagal Masuk: " + res.message);
+            resetBtn(btn, originalText);
+            document.getElementById('pass-login').value = '';
+            document.getElementById('pass-login').focus();
+        }
+    })
+    .withFailureHandler(err => {
+        // Error Koneksi / Server
+        alert("Terjadi kesalahan koneksi: " + err.message);
+        resetBtn(btn, originalText);
+    })
+    .loginUser(u, p);
+}
+
+// Helper untuk mengembalikan tombol ke kondisi semula
+function resetBtn(btn, html) {
+    btn.disabled = false; 
+    btn.innerHTML = html;
+    btn.classList.remove('opacity-75', 'cursor-not-allowed');
+}
+</script>
